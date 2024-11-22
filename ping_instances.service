@@ -1,17 +1,22 @@
 [Unit]
 Description=Home network diagnosis script 
 After=network.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+RequiresMountsFor=/tmp  # Ensure lock file directory is mounted
 
 [Service]
-ExecStart=/usr/local/bin/ping_instances.sh mail.google.com 8.8.8.8 1.1.1.1 192.168.0.1 192.168.0.2 192.168.0.3
+Type=simple
+ExecStartPre=/bin/sh -c 'if [ -e /tmp/ping_instances.lock ]; then exit 1; fi; touch /tmp/ping_instances.lock'
+ExecStart=[PATH_TO_SCRIPT] mail.google.com 8.8.8.8 1.1.1.1 192.168.0.1 192.168.0.2 192.168.0.3
 ExecStopPost=/bin/rm -f /tmp/ping_instances.lock
 Restart=always
-Type=simple
+RestartSec=10
+User=[REPLACE_ME]
 KillMode=control-group
-StandardOutput=syslog
-StandardError=syslog
 SyslogIdentifier=ping_instances
 Environment=PATH=/usr/bin:/bin
+PIDFile=/tmp/ping_instances.pid
 
 [Install]
 WantedBy=multi-user.target

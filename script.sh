@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Database file
-DB_FILE="~/pinger.db"
+# Directory for database files
+DB_PATH="[PATH_TO_DB_FOLDER]"
 
 # Path to the lock file
 LOCK_FILE="/tmp/ping_instances.lock"
@@ -18,10 +18,9 @@ if [ "$#" -lt 1 ]; then
   exit 1
 fi
 
-# Check if the database path is writable
-if [ -e "$DB_FILE" ] && [ ! -w "$DB_FILE" ]; then
-  echo "Error: Cannot write to the database file $DB_FILE. Exiting."
-  exit 1
+# Ensure database folder exists
+if [ ! -d "$DB_PATH" ]; then
+  mkdir -p "$DB_PATH" || { echo "Error: Cannot create database directory $DB_PATH"; exit 1; }
 fi
 
 # Check if the lock file exists to prevent duplicate instances
@@ -36,37 +35,59 @@ fi
 # Remove the lock file on exit
 trap "rm -f $LOCK_FILE" EXIT
 
-# Loop through each IP provided as an argument
-for i in "$@"; do
-	table_name="ping_$i"
-  
-  # Create the SQLite database and table if it doesn't exist
-  sqlite3 "$DB_FILE" "CREATE TABLE IF NOT EXISTS pings (timestamp TEXT, response_time_ms REAL);"
+# Optimized function for pinging and writing results
+ping_and_log() {
+  local ip="$1"
+  local db_file="$2"
 
-  # Start the pinging process in the background
+  # Initialize the database
+  sqlite3 "$db_file" <<EOF
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+CREATE TABLE IF NOT EXISTS ping (
+  timestamp TEXT,
+  response_time_ms REAL
+);
+EOF
+
+  # Batch rows for performance
+  batch_rows=""
+  batch_size=10
+
+  echo "Starting ping instance for IP $ip, logging to $db_file"
+
+  while true; do
+    timestamp=$(date '+%Y-%m-%dT%H:%M:%S')
+    response_time=$(ping -c 1 "$ip" | awk -F'time=' '/time=/{print $2}' | cut -d' ' -f1 || echo -1)
+
+    # Append the result to the batch
+    batch_rows+="'$timestamp', $response_time), ("
+
+    # Write batch to the database when it reaches the batch size
+    if [ "$(echo "$batch_rows" | grep -o ')' | wc -l)" -ge "$batch_size" ]; then
+      batch_rows=${batch_rows::-3} # Remove trailing ", ("
+      sqlite3 "$db_file" <<EOF
+BEGIN TRANSACTION;
+INSERT INTO ping (timestamp, response_time_ms) VALUES ($batch_rows);
+COMMIT;
+EOF
+      batch_rows=""
+    fi
+
+    sleep 1
+  done
+}
+
+# Loop through each IP and spawn a subprocess
+for ip in "$@"; do
+  db_file="$DB_PATH/ping_$ip.db"
+
+  # Use subshell to ping and log in the background
   (
-    echo "Starting instance for IP $i, logging to $DB_FILE : $table_name"
-
-    # Infinite loop to continuously ping the IP
-    while true; do
-      # Generate an ISO 8601 timestamp
-      timestamp=$(date '+%Y-%m-%dT%H:%M:%S')
-
-      # Ping the IP address once and extract the response time
-      response_time=$(ping -c 1 "$i" | awk -F'time=' '/time=/{print $2}' | cut -d' ' -f1)
-      
-      # Check if we got a response time; if not, set it to -1 (timeout)
-      if [ -z "$response_time" ]; then
-        response_time=-1
-      fi
-
-      # Insert the ping result into the SQLite database
-      sqlite3 "$DB_FILE" "INSERT INTO $table_name (timestamp, response_time_ms) VALUES ('$timestamp', $response_time);"
-      
-      # Wait for a second before the next ping
-      sleep 1
-    done
+    ping_and_log "$ip" "$db_file"
   ) &
 done
+
+wait  # Wait for all background processes to finish
 
 echo "All instances started."
