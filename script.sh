@@ -65,7 +65,7 @@ EOF
 
     # Write batch to the database when it reaches the batch size
     if [ "$(echo "$batch_rows" | grep -o ')' | wc -l)" -ge "$batch_size" ]; then
-      batch_rows=${batch_rows::-3} # Remove trailing ", ("
+      batch_rows=${batch_rows::-4} # Remove trailing "), ("
       sqlite3 "$db_file" <<EOF
 BEGIN TRANSACTION;
 INSERT INTO ping (timestamp, response_time_ms) VALUES ($batch_rows);
