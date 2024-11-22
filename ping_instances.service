@@ -1,0 +1,17 @@
+[Unit]
+Description=Home network diagnosis script 
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/ping_instances.sh mail.google.com 8.8.8.8 1.1.1.1 192.168.0.1 192.168.0.2 192.168.0.3
+ExecStopPost=/bin/rm -f /tmp/ping_instances.lock
+Restart=always
+Type=simple
+KillMode=control-group
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ping_instances
+Environment=PATH=/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

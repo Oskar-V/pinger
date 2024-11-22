@@ -1,0 +1,15 @@
+services:
+  dev-backend:
+    container_name: backend
+    image: oven/bun:alpine
+    working_dir: /backend
+    command: >
+      sh -c "bun install && bun run --hot server.ts"
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./display/backend:/backend
+    ports:
+      - "8080:8080"
+    restart: always
+
