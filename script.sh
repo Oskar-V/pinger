@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Directory for database files
-DB_PATH="[PATH_TO_DB_FOLDER]"
+DB_PATH="/home/oskar/code/IoT/pinger/data"
 
 # Path to the lock file
 LOCK_FILE="/tmp/ping_instances.lock"
@@ -59,6 +59,11 @@ EOF
   while true; do
     timestamp=$(date '+%Y-%m-%dT%H:%M:%S')
     response_time=$(ping -c 1 "$ip" | awk -F'time=' '/time=/{print $2}' | cut -d' ' -f1 || echo -1)
+
+		 # If response_time is empty, use NULL
+    if [ -z "$response_time" ]; then
+      response_time="NULL"
+    fi
 
     # Append the result to the batch
     batch_rows+="'$timestamp', $response_time), ("
