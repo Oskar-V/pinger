@@ -1,5 +1,5 @@
 services:
-  dev-backend:
+  backend:
     container_name: backend
     image: oven/bun:alpine
     working_dir: /backend
@@ -13,4 +13,15 @@ services:
     ports:
       - "8080:8080"
     restart: always
-
+  frontend:
+    container_name: frontend
+    image: oven/bun:alpine
+    working_dir: /frontend
+    command: >
+      sh -c "bun install && bun run dev --host"
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./display/frontend:/frontend
+    ports:
+      - "3000:5173"
