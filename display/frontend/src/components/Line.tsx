@@ -3,7 +3,7 @@ import Chart from 'react-apexcharts'
 
 const LineGraph = (props: any) => {
 	const { file_name } = props
-	const max_length = 120
+	const max_length = 240
 	const update_frequency = 1e4;
 	const [data, setData] = useState<number[][]>([]);
 	const [last_timestamp, setLastTimestamp] = useState(0);
@@ -12,7 +12,7 @@ const LineGraph = (props: any) => {
 		let timeout: number;
 		fetch(`http://localhost:8080/data?${file_name}=${last_timestamp}`)
 			.then(async (res) => {
-				const tmp = (await res.json())[file_name];
+				const tmp = (await res.json())[file_name] as number[][];
 				if (tmp.length === 0) {
 					throw new Error('Received no data from server - retrying in 10s')
 				}
@@ -42,20 +42,54 @@ const LineGraph = (props: any) => {
 
 	return <Chart
 		options={{
+			title: {
+				text: file_name,
+				align: 'center'
+			},
 			chart: {
-				type: "area"
+				type: "area",
+				toolbar: {
+					show: false
+				}
 			},
 			xaxis: {
 				type: "datetime",
 			},
+			yaxis: {
+				title: {
+					text:'Ping'
+				},
+				min: 0
+			},
 			stroke: {
-				width: 1,
-				curve: "smooth"
+				width: 2,
+				curve: "smooth",
+				colors: ['#0f0']
+			},
+			fill: {
+				type: "gradient",
+				gradient: {
+					type: 'vertical',
+					shadeIntensity: 1,
+					opacityFrom: 1,
+					opacityTo: 1,
+					gradientToColors:['#f00']
+				}
+			},
+			tooltip: {
+				shared: false,
+				y: {
+					formatter: (val) => `${val} ms`
+				},
+				x: {
+					formatter: (val) => `T - ${Math.round((Date.now() - val) / 1e3 + 3600 * 2)} seconds`
+				}
 			}
 		}}
-		series={[{ data }]}
+		series={[{ name: "Response", data }]}
 		type="line"
 		width="100%"
+		height={350}
 	/>
 }
 
